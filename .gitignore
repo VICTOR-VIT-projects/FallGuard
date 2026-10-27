@@ -1,0 +1,5 @@
+FallGuard/build/
+test/fdtest
+test/fdtest.exe
+__pycache__/
+*.csv

@@ -1,0 +1,366 @@
+<title>FallGuard Wiring</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one wide schematic sheet, then a connection list and power rules in two columns. */
+:root {
+  --bg: #f3f5f2; --fg: #1d2328; --muted: #5b666e; --card: #ffffff; --line: #d3d9d6;
+  --pcb: #1d3a4c; --pcb-fg: #e4edf2; --pad: #e2b34a; --screen: #0e1a22; --screen-fg: #8fe3ff;
+  --w-pwr: #cf3328; --w-3v3: #d97400; --w-gnd: #39424a; --w-sda: #1f6fd1; --w-scl: #0d8a78; --w-sig: #8a3fd1;
+  --led-g: #1f9d55; --led-r: #d4372b; --warn: #a14a00;
+  --display: "Barlow Semi Condensed", "Arial Narrow", sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161a; --fg: #dde3e7; --muted: #94a1ab; --card: #182027; --line: #2a333b;
+    --pcb: #1f4a62; --pcb-fg: #e4edf2; --pad: #e8bd5a; --screen: #050b0f;
+    --w-pwr: #ff6a5c; --w-3v3: #ffa53d; --w-gnd: #a9b4bd; --w-sda: #5ca4ff; --w-scl: #3cc9b2; --w-sig: #bb8cf2;
+    --led-g: #3ccf7c; --led-r: #ff6a5c; --warn: #ffb067; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161a; --fg: #dde3e7; --muted: #94a1ab; --card: #182027; --line: #2a333b;
+  --pcb: #1f4a62; --pcb-fg: #e4edf2; --pad: #e8bd5a; --screen: #050b0f;
+  --w-pwr: #ff6a5c; --w-3v3: #ffa53d; --w-gnd: #a9b4bd; --w-sda: #5ca4ff; --w-scl: #3cc9b2; --w-sig: #bb8cf2;
+  --led-g: #3ccf7c; --led-r: #ff6a5c; --warn: #ffb067; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 48px; display: grid; gap: 28px; }
+h1, h2 { font-family: var(--display); font-weight: 700; letter-spacing: .2px; text-wrap: balance; margin: 0; }
+h1 { font-size: 34px; line-height: 1.1; }
+h2 { font-size: 22px; margin-bottom: 10px; }
+.lede { color: var(--muted); max-width: 68ch; margin: 6px 0 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; align-items: center; }
+.legend span { display: inline-flex; gap: 8px; align-items: center; }
+.legend i { width: 26px; height: 4px; border-radius: 2px; display: inline-block; }
+.legend .note { color: var(--muted); }
+.sheet { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+.sheet svg { display: block; width: 100%; min-width: 820px; height: auto; }
+figure { margin: 0; }
+figcaption { color: var(--muted); font-size: 14px; margin-top: 8px; max-width: 80ch; }
+.cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 860px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th { text-align: left; font-family: var(--display); font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td code, li code { font-family: var(--mono); font-size: 13px; }
+tr.group td { font-family: var(--display); font-weight: 700; font-size: 15px; padding-top: 16px; border-bottom: 0; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+ol, ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.rule { color: var(--warn); font-weight: 600; }
+.small { color: var(--muted); font-size: 14px; }
+/* schematic */
+.w { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.pwr { stroke: var(--w-pwr); } .v33 { stroke: var(--w-3v3); } .gnd { stroke: var(--w-gnd); }
+.sda { stroke: var(--w-sda); } .scl { stroke: var(--w-scl); } .sig { stroke: var(--w-sig); }
+.fpwr { fill: var(--w-pwr); } .fv33 { fill: var(--w-3v3); } .fgnd { fill: var(--w-gnd); }
+.board { fill: var(--pcb); }
+.pl { fill: var(--pcb-fg); font: 11px var(--mono); }
+.pl.on { font-weight: 600; fill: var(--pad); }
+.pad { fill: var(--pad); }
+.nc { fill: none; stroke: var(--pcb-fg); stroke-width: 1.2; opacity: .5; }
+.part { fill: var(--card); stroke: var(--fg); stroke-width: 1.5; }
+.sym { fill: none; stroke: var(--fg); stroke-width: 1.8; stroke-linecap: round; }
+.term { fill: var(--fg); }
+.t { fill: var(--fg); font: 12px var(--body); }
+.tb { fill: var(--fg); font: 700 14px var(--display); letter-spacing: .3px; }
+.tm { fill: var(--muted); font: 11px var(--body); }
+.tc { fill: var(--fg); font: 11px var(--mono); }
+.tcm { fill: var(--muted); font: 11px var(--mono); }
+.scr { fill: var(--screen); }
+.scrt { fill: var(--screen-fg); font: 11px var(--mono); }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>FallGuard Wiring</h1>
+    <p class="lede">ESP32 DevKit V1 (30-pin) with the MPU6050 motion sensor, 1.3" SH1106 OLED, CANCEL and SOS buttons, buzzer, status LEDs, and a switched Li-ion battery supply. Pin numbers match <code>FallGuard/config.h</code>.</p>
+  </header>
+
+  <div class="legend" aria-label="Wire colour legend">
+    <span><i style="background:var(--w-pwr)"></i>5 V / battery +</span>
+    <span><i style="background:var(--w-3v3)"></i>3.3 V</span>
+    <span><i style="background:var(--w-gnd)"></i>GND</span>
+    <span><i style="background:var(--w-sda)"></i>I2C data (SDA)</span>
+    <span><i style="background:var(--w-scl)"></i>I2C clock (SCL)</span>
+    <span><i style="background:var(--w-sig)"></i>GPIO signal</span>
+    <span class="note">● dot = joined &nbsp;·&nbsp; wires crossing without a dot are not connected</span>
+  </div>
+
+  <figure>
+    <div class="sheet">
+<svg viewBox="0 100 1040 790" role="img" aria-label="Wiring: MPU6050 on GPIO21/22 and OLED on GPIO16/17 to the right of the ESP32, both powered from a 3.3 V rail; buttons on GPIO25/26, LEDs on GPIO32/33 and an NPN-driven buzzer on GPIO13 to the left; battery, TP4056 charger, power switch and 5 V boost converter along the bottom feeding VIN.">
+  <!-- ===== ESP32 board ===== -->
+  <text class="tb" x="540" y="128" text-anchor="middle">ESP32 DevKit V1 · 30-pin</text>
+  <rect class="board" x="430" y="140" width="220" height="560" rx="8"/>
+  <rect x="500" y="160" width="80" height="120" rx="3" fill="none" stroke="var(--pcb-fg)" stroke-opacity=".45"/>
+  <line x1="500" y1="186" x2="580" y2="186" stroke="var(--pcb-fg)" stroke-opacity=".45"/>
+  <text class="pl" x="540" y="177" text-anchor="middle" opacity=".7">antenna</text>
+  <text class="pl" x="540" y="226" text-anchor="middle">ESP32</text>
+  <text class="pl" x="540" y="242" text-anchor="middle">WROOM</text>
+  <rect class="board" x="515" y="698" width="50" height="18" rx="2"/>
+  <text class="tm" x="540" y="732" text-anchor="middle">micro-USB (flash / serial)</text>
+
+  <!-- left header labels -->
+  <g text-anchor="start">
+    <text class="pl" x="460" y="174">EN</text><text class="pl" x="460" y="210">VP 36</text><text class="pl" x="460" y="246">VN 39</text>
+    <text class="pl" x="460" y="282">D34</text><text class="pl" x="460" y="318">D35</text>
+    <text class="pl on" x="460" y="354">D32</text><text class="pl on" x="460" y="390">D33</text>
+    <text class="pl on" x="460" y="426">D25</text><text class="pl on" x="460" y="462">D26</text>
+    <text class="pl" x="460" y="498">D27</text><text class="pl" x="460" y="534">D14</text><text class="pl" x="460" y="570">D12</text>
+    <text class="pl on" x="460" y="606">D13</text><text class="pl on" x="460" y="642">GND</text><text class="pl on" x="460" y="678">VIN</text>
+  </g>
+  <!-- right header labels -->
+  <g text-anchor="end">
+    <text class="pl" x="620" y="174">D23</text><text class="pl on" x="620" y="210">D22</text>
+    <text class="pl" x="620" y="246">TX0</text><text class="pl" x="620" y="282">RX0</text>
+    <text class="pl on" x="620" y="318">D21</text><text class="pl" x="620" y="354">D19</text><text class="pl" x="620" y="390">D18</text>
+    <text class="pl" x="620" y="426">D5</text><text class="pl on" x="620" y="462">TX2 (17)</text><text class="pl on" x="620" y="498">RX2 (16)</text>
+    <text class="pl" x="620" y="534">D4</text><text class="pl" x="620" y="570">D2</text><text class="pl" x="620" y="606">D15</text>
+    <text class="pl on" x="620" y="642">GND</text><text class="pl on" x="620" y="678">3V3</text>
+  </g>
+
+  <!-- ===== Right side: 3V3 + GND rails, IMU, OLED ===== -->
+  <text class="tcm" x="690" y="178" text-anchor="middle">GND</text>
+  <text class="tcm" x="706" y="158" text-anchor="middle">3V3</text>
+  <path class="w gnd" d="M632 638 H690 V186"/>
+  <path class="w v33" d="M632 674 H706 V166"/>
+  <path class="w v33" d="M706 166 H800"/>
+  <path class="w gnd" d="M690 186 H800"/>
+  <path class="w scl" d="M632 206 H800"/>
+  <path class="w sda" d="M632 314 H760 V226 H800"/>
+  <path class="w gnd" d="M690 386 H800"/>
+  <path class="w v33" d="M706 422 H800"/>
+  <path class="w scl" d="M632 458 H800"/>
+  <path class="w sda" d="M632 494 H800"/>
+  <circle class="fv33" cx="706" cy="166" r="4.5"/><circle class="fgnd" cx="690" cy="186" r="4.5"/>
+  <circle class="fgnd" cx="690" cy="386" r="4.5"/><circle class="fv33" cx="706" cy="422" r="4.5"/>
+
+  <!-- MPU6050 / GY-521 -->
+  <rect class="part" x="800" y="148" width="190" height="176" rx="6"/>
+  <g class="term">
+    <rect x="796" y="162" width="8" height="8"/><rect x="796" y="182" width="8" height="8"/><rect x="796" y="202" width="8" height="8"/><rect x="796" y="222" width="8" height="8"/>
+  </g>
+  <g fill="none" stroke="var(--muted)" stroke-width="1.2">
+    <rect x="796" y="242" width="8" height="8"/><rect x="796" y="262" width="8" height="8"/><rect x="796" y="282" width="8" height="8"/><rect x="796" y="302" width="8" height="8"/>
+  </g>
+  <text class="tc" x="812" y="170">VCC</text><text class="tc" x="812" y="190">GND</text><text class="tc" x="812" y="210">SCL</text><text class="tc" x="812" y="230">SDA</text>
+  <text class="tcm" x="812" y="250">XDA</text><text class="tcm" x="812" y="270">XCL</text><text class="tcm" x="812" y="290">AD0</text><text class="tcm" x="812" y="310">INT</text>
+  <text class="tb" x="912" y="178" text-anchor="middle">MPU6050</text>
+  <text class="tm" x="912" y="194" text-anchor="middle">GY-521 board</text>
+  <text class="tcm" x="912" y="218" text-anchor="middle">WHO_AM_I 0x70</text>
+  <text class="tcm" x="912" y="234" text-anchor="middle">I2C addr 0x68</text>
+  <text class="tm" x="912" y="282" text-anchor="middle">XDA · XCL · AD0 · INT</text>
+  <text class="tm" x="912" y="296" text-anchor="middle">leave unconnected</text>
+
+  <!-- 1.3" OLED -->
+  <text class="tb" x="800" y="358">1.3" OLED · I2C, 4-pin</text>
+  <rect class="part" x="800" y="366" width="190" height="146" rx="6"/>
+  <g class="term">
+    <rect x="796" y="382" width="8" height="8"/><rect x="796" y="418" width="8" height="8"/><rect x="796" y="454" width="8" height="8"/><rect x="796" y="490" width="8" height="8"/>
+  </g>
+  <text class="tc" x="812" y="390">GND</text><text class="tc" x="812" y="426">VCC</text><text class="tc" x="812" y="462">SCL</text><text class="tc" x="812" y="498">SDA</text>
+  <rect class="scr" x="866" y="380" width="112" height="118" rx="3"/>
+  <text class="scrt" x="922" y="428" text-anchor="middle">SH1106</text>
+  <text class="scrt" x="922" y="446" text-anchor="middle">128×64</text>
+  <text class="scrt" x="922" y="464" text-anchor="middle">addr 0x3C</text>
+  <text class="tm" x="800" y="532">GND/VCC order differs between</text>
+  <text class="tm" x="800" y="547">modules: read your board's silkscreen.</text>
+
+  <!-- ===== Left side: LEDs, buttons, buzzer driver ===== -->
+  <text class="tcm" x="90" y="338" text-anchor="middle">GND</text>
+  <path class="w gnd" d="M90 350 V830 H300"/>
+  <path class="w gnd" d="M448 638 H90"/>
+
+  <!-- green LED, D32 -->
+  <path class="w sig" d="M448 350 H400 M360 350 H252 M234 350 H90"/>
+  <rect class="part" x="360" y="343" width="40" height="14" rx="2"/>
+  <text class="tm" x="380" y="337" text-anchor="middle">330 Ω</text>
+  <polygon points="252,340 252,360 234,350" fill="var(--led-g)" stroke="var(--fg)" stroke-width="1.2"/>
+  <line class="sym" x1="234" y1="340" x2="234" y2="360"/>
+  <text class="t" x="150" y="343" text-anchor="middle">green LED</text>
+
+  <!-- red LED, D33 -->
+  <path class="w sig" d="M448 386 H400 M360 386 H252 M234 386 H90"/>
+  <rect class="part" x="360" y="379" width="40" height="14" rx="2"/>
+  <text class="tm" x="380" y="373" text-anchor="middle">330 Ω</text>
+  <polygon points="252,376 252,396 234,386" fill="var(--led-r)" stroke="var(--fg)" stroke-width="1.2"/>
+  <line class="sym" x1="234" y1="376" x2="234" y2="396"/>
+  <text class="t" x="150" y="379" text-anchor="middle">red LED</text>
+
+  <!-- CANCEL button, D25 -->
+  <path class="w sig" d="M448 422 H262 M218 422 H90"/>
+  <circle cx="262" cy="422" r="3.5" class="term"/><circle cx="218" cy="422" r="3.5" class="term"/>
+  <line class="sym" x1="212" y1="411" x2="268" y2="411"/><line class="sym" x1="240" y1="411" x2="240" y2="403"/>
+  <text class="t" x="150" y="415" text-anchor="middle">CANCEL button</text>
+
+  <!-- SOS button, D26 -->
+  <path class="w sig" d="M448 458 H262 M218 458 H90"/>
+  <circle cx="262" cy="458" r="3.5" class="term"/><circle cx="218" cy="458" r="3.5" class="term"/>
+  <line class="sym" x1="212" y1="447" x2="268" y2="447"/><line class="sym" x1="240" y1="447" x2="240" y2="439"/>
+  <text class="t" x="150" y="451" text-anchor="middle">SOS · hold 1 s</text>
+
+  <!-- buzzer via NPN, D13 -->
+  <path class="w sig" d="M448 602 H400 M360 602 H300"/>
+  <rect class="part" x="360" y="595" width="40" height="14" rx="2"/>
+  <text class="tm" x="380" y="589" text-anchor="middle">1 kΩ</text>
+  <circle cx="280" cy="602" r="21" fill="var(--card)" stroke="var(--fg)" stroke-width="1.5"/>
+  <line class="sym" x1="300" y1="602" x2="287" y2="602"/>
+  <line class="sym" x1="287" y1="589" x2="287" y2="615"/>
+  <line class="sym" x1="287" y1="596" x2="268" y2="582"/>
+  <line class="sym" x1="287" y1="608" x2="268" y2="622"/>
+  <polygon points="268,622 276.7,620.3 271.9,613.9" fill="var(--fg)"/>
+  <text class="tc" x="300" y="584">B</text><text class="tc" x="250" y="580">C</text><text class="tc" x="250" y="634">E</text>
+  <path class="w gnd" d="M268 622 V638"/>
+  <path class="w sig" d="M268 582 V534"/>
+  <rect class="part" x="250" y="500" width="36" height="34" rx="5"/>
+  <text class="tc" x="268" y="521" text-anchor="middle">BZ</text>
+  <text class="tc" x="292" y="510">+</text><text class="tc" x="292" y="532">−</text>
+  <text class="t" x="140" y="575" text-anchor="middle">NPN transistor</text>
+  <text class="tm" x="140" y="590" text-anchor="middle">2N2222 / BC547</text>
+  <text class="tm" x="140" y="604" text-anchor="middle">flat face: E B C</text>
+  <text class="t" x="140" y="513" text-anchor="middle">active buzzer</text>
+  <text class="tm" x="140" y="528" text-anchor="middle">+ leg to 5 V</text>
+  <circle class="fgnd" cx="268" cy="638" r="4.5"/>
+  <circle class="fgnd" cx="90" cy="350" r="4.5"/><circle class="fgnd" cx="90" cy="386" r="4.5"/>
+  <circle class="fgnd" cx="90" cy="422" r="4.5"/><circle class="fgnd" cx="90" cy="458" r="4.5"/>
+  <circle class="fgnd" cx="90" cy="638" r="4.5"/>
+
+  <!-- 5 V net: VIN, buzzer +, boost OUT+ -->
+  <path class="w pwr" d="M448 674 H200 V480 H268 V500"/>
+  <text class="tm" x="340" y="667" text-anchor="middle">5 V into VIN</text>
+  <path class="w pwr" d="M300 780 H230 V674"/>
+  <path class="w pwr" d="M230 720 H150 V770"/>
+  <line class="sym" x1="134" y1="770" x2="166" y2="770"/>
+  <path class="sym" d="M134 781 Q150 774 166 781"/>
+  <path class="w gnd" d="M150 781 V830"/>
+  <text class="tc" x="172" y="768">470µF</text><text class="tc" x="172" y="784">+100nF</text>
+  <circle class="fpwr" cx="230" cy="674" r="4.5"/><circle class="fpwr" cx="230" cy="720" r="4.5"/>
+  <circle class="fgnd" cx="150" cy="830" r="4.5"/>
+
+  <!-- ===== Bottom: power chain ===== -->
+  <!-- boost converter -->
+  <rect class="part" x="300" y="756" width="140" height="100" rx="6"/>
+  <g class="term"><rect x="296" y="776" width="8" height="8"/><rect x="296" y="826" width="8" height="8"/><rect x="436" y="776" width="8" height="8"/><rect x="436" y="826" width="8" height="8"/></g>
+  <text class="tc" x="310" y="784">OUT+</text><text class="tc" x="310" y="834">OUT−</text>
+  <text class="tc" x="430" y="784" text-anchor="end">IN+</text><text class="tc" x="430" y="834" text-anchor="end">IN−</text>
+  <text class="tb" x="370" y="806" text-anchor="middle">5 V boost</text>
+  <text class="tm" x="370" y="820" text-anchor="middle">MT3608</text>
+  <text class="tm" x="370" y="876" text-anchor="middle" style="fill:var(--warn)">set to 5.0 V before connecting</text>
+
+  <!-- switch -->
+  <path class="w pwr" d="M440 780 H497 M553 780 H620"/>
+  <circle cx="500" cy="780" r="3.5" class="term"/><circle cx="550" cy="780" r="3.5" class="term"/>
+  <line class="sym" x1="500" y1="780" x2="545" y2="763"/>
+  <text class="t" x="525" y="804" text-anchor="middle">power switch</text>
+
+  <path class="w gnd" d="M440 830 H620"/>
+
+  <!-- TP4056 -->
+  <rect class="part" x="620" y="756" width="150" height="100" rx="6"/>
+  <g class="term"><rect x="616" y="776" width="8" height="8"/><rect x="616" y="826" width="8" height="8"/><rect x="766" y="776" width="8" height="8"/><rect x="766" y="826" width="8" height="8"/></g>
+  <text class="tc" x="630" y="784">OUT+</text><text class="tc" x="630" y="834">OUT−</text>
+  <text class="tc" x="760" y="784" text-anchor="end">B+</text><text class="tc" x="760" y="834" text-anchor="end">B−</text>
+  <text class="tb" x="695" y="806" text-anchor="middle">TP4056</text>
+  <text class="tm" x="695" y="820" text-anchor="middle">with protection</text>
+  <rect class="part" x="675" y="856" width="40" height="10" rx="2"/>
+  <text class="tm" x="695" y="882" text-anchor="middle">USB in: charge with switch OFF</text>
+
+  <!-- battery -->
+  <path class="w pwr" d="M770 780 H850"/>
+  <path class="w gnd" d="M770 830 H850"/>
+  <rect class="part" x="850" y="756" width="120" height="100" rx="8"/>
+  <rect class="term" x="970" y="794" width="6" height="24" rx="1"/>
+  <g class="term"><rect x="846" y="776" width="8" height="8"/><rect x="846" y="826" width="8" height="8"/></g>
+  <text class="tc" x="862" y="784">+</text><text class="tc" x="862" y="834">−</text>
+  <text class="tb" x="912" y="806" text-anchor="middle">Li-ion 1S</text>
+  <text class="tm" x="912" y="820" text-anchor="middle">3.7 V nominal</text>
+
+  <!-- header pads on top of the wires -->
+  <g class="nc">
+    <circle cx="448" cy="170" r="4"/><circle cx="448" cy="206" r="4"/><circle cx="448" cy="242" r="4"/><circle cx="448" cy="278" r="4"/><circle cx="448" cy="314" r="4"/>
+    <circle cx="448" cy="494" r="4"/><circle cx="448" cy="530" r="4"/><circle cx="448" cy="566" r="4"/>
+    <circle cx="632" cy="170" r="4"/><circle cx="632" cy="242" r="4"/><circle cx="632" cy="278" r="4"/><circle cx="632" cy="350" r="4"/><circle cx="632" cy="386" r="4"/><circle cx="632" cy="422" r="4"/>
+    <circle cx="632" cy="530" r="4"/><circle cx="632" cy="566" r="4"/><circle cx="632" cy="602" r="4"/>
+  </g>
+  <g class="pad">
+    <circle cx="448" cy="350" r="5"/><circle cx="448" cy="386" r="5"/><circle cx="448" cy="422" r="5"/><circle cx="448" cy="458" r="5"/>
+    <circle cx="448" cy="602" r="5"/><circle cx="448" cy="638" r="5"/><circle cx="448" cy="674" r="5"/>
+    <circle cx="632" cy="206" r="5"/><circle cx="632" cy="314" r="5"/><circle cx="632" cy="458" r="5"/><circle cx="632" cy="494" r="5"/>
+    <circle cx="632" cy="638" r="5"/><circle cx="632" cy="674" r="5"/>
+  </g>
+</svg>
+    </div>
+    <figcaption>The board is drawn from above with the USB port at the bottom; pin names match the silkscreen. GPIO 16 and 17 are printed as RX2 and TX2. The motion sensor uses the hardware I2C pins (21/22). The OLED has its own software-I2C pair (16/17), so a slow display refresh never delays a sensor read.</figcaption>
+  </figure>
+
+  <div class="cols">
+    <section>
+      <h2>Connection list</h2>
+      <div class="tbl">
+      <table>
+        <thead><tr><th>From</th><th>To ESP32</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr class="group"><td colspan="3">MPU6050 (GY-521)</td></tr>
+          <tr><td><code>VCC</code></td><td><span class="sw" style="background:var(--w-3v3)"></span><code>3V3</code></td><td>Not 5 V</td></tr>
+          <tr><td><code>GND</code></td><td><span class="sw" style="background:var(--w-gnd)"></span><code>GND</code></td><td></td></tr>
+          <tr><td><code>SCL</code></td><td><span class="sw" style="background:var(--w-scl)"></span><code>D22</code></td><td>Hardware I2C</td></tr>
+          <tr><td><code>SDA</code></td><td><span class="sw" style="background:var(--w-sda)"></span><code>D21</code></td><td></td></tr>
+          <tr><td><code>XDA XCL AD0 INT</code></td><td>nothing</td><td>AD0 open keeps address 0x68</td></tr>
+          <tr class="group"><td colspan="3">1.3" OLED (SH1106)</td></tr>
+          <tr><td><code>VCC</code></td><td><span class="sw" style="background:var(--w-3v3)"></span><code>3V3</code></td><td>Check pin order on the module</td></tr>
+          <tr><td><code>GND</code></td><td><span class="sw" style="background:var(--w-gnd)"></span><code>GND</code></td><td></td></tr>
+          <tr><td><code>SCL</code></td><td><span class="sw" style="background:var(--w-scl)"></span><code>TX2</code> (GPIO 17)</td><td>Software I2C</td></tr>
+          <tr><td><code>SDA</code></td><td><span class="sw" style="background:var(--w-sda)"></span><code>RX2</code> (GPIO 16)</td><td></td></tr>
+          <tr class="group"><td colspan="3">Buttons (internal pull-ups, no resistors)</td></tr>
+          <tr><td>CANCEL, one leg</td><td><span class="sw" style="background:var(--w-sig)"></span><code>D25</code></td><td>Other leg to GND</td></tr>
+          <tr><td>SOS, one leg</td><td><span class="sw" style="background:var(--w-sig)"></span><code>D26</code></td><td>Other leg to GND. Must be held 1 s</td></tr>
+          <tr><td colspan="3" class="small">On a 4-leg tactile switch, use two legs that are diagonal from each other. Legs on the same side may be permanently joined.</td></tr>
+          <tr class="group"><td colspan="3">Buzzer</td></tr>
+          <tr><td>1 kΩ → NPN base</td><td><span class="sw" style="background:var(--w-sig)"></span><code>D13</code></td><td>Emitter to GND</td></tr>
+          <tr><td>Buzzer −</td><td>NPN collector</td><td>Buzzer + to <code>VIN</code> (5 V)</td></tr>
+          <tr><td colspan="3" class="small">If you have a 3-pin buzzer <em>module</em>, skip the transistor: I/O → <code>D13</code>, VCC → <code>VIN</code>, GND → <code>GND</code>. If it beeps when it should be silent, it is low-triggered; tell us and we will invert it in firmware.</td></tr>
+          <tr class="group"><td colspan="3">LEDs (optional)</td></tr>
+          <tr><td>330 Ω → green LED</td><td><span class="sw" style="background:var(--w-sig)"></span><code>D32</code></td><td>Long leg toward the resistor, short leg to GND</td></tr>
+          <tr><td>330 Ω → red LED</td><td><span class="sw" style="background:var(--w-sig)"></span><code>D33</code></td><td>Same</td></tr>
+          <tr class="group"><td colspan="3">Power</td></tr>
+          <tr><td>Battery + / −</td><td>TP4056 <code>B+</code> / <code>B−</code></td><td>Check polarity twice</td></tr>
+          <tr><td>TP4056 <code>OUT+</code></td><td>switch → boost <code>IN+</code></td><td></td></tr>
+          <tr><td>TP4056 <code>OUT−</code></td><td>boost <code>IN−</code></td><td></td></tr>
+          <tr><td>Boost <code>OUT+</code></td><td><span class="sw" style="background:var(--w-pwr)"></span><code>VIN</code></td><td>470 µF + 100 nF across VIN–GND, close to the board</td></tr>
+          <tr><td>Boost <code>OUT−</code></td><td><span class="sw" style="background:var(--w-gnd)"></span><code>GND</code></td><td></td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section style="display:grid;gap:28px">
+      <div>
+        <h2>Power rules</h2>
+        <ul>
+          <li><span class="rule">Set the boost converter to 5.0 V with a multimeter first.</span> The MT3608 is adjustable, and many arrive set to 9–12 V, which would destroy the ESP32.</li>
+          <li><span class="rule">Battery never goes straight to VIN or 3V3.</span> On VIN, the board's regulator browns out below about 4.3 V. On 3V3, a full cell (4.2 V) is over the ESP32's limit.</li>
+          <li><span class="rule">Charge with the switch OFF.</span> A TP4056 can't run the load and charge correctly at the same time.</li>
+          <li><span class="rule">Don't plug in the ESP32's USB while the switch is ON.</span> Two 5 V sources would feed each other. Switch OFF to flash or debug.</li>
+          <li>Use a protected cell or a TP4056 board with the protection chip (6 pins: <code>IN± B± OUT±</code>). The 4-pin version has no over-discharge cutoff.</li>
+        </ul>
+      </div>
+      <div>
+        <h2>First power-on</h2>
+        <ol>
+          <li>Leave the battery unplugged. With a multimeter, check there is no short between <code>3V3</code> and <code>GND</code>, or between <code>VIN</code> and <code>GND</code>.</li>
+          <li>Power from USB only. The serial monitor (115200 baud) should show <code>WHO_AM_I=0x70</code>, and the OLED should show CALIBRATING and then MONITORING.</li>
+          <li>Tap CANCEL, hold SOS for 1 s: the buzzer and red LED should start; CANCEL silences them.</li>
+          <li>Only then: set the boost to 5.0 V with no load, wire it to VIN, unplug USB, switch ON.</li>
+        </ol>
+        <p class="small">The motion sensor and OLED wiring is verified on hardware. The buzzer, buttons, LEDs and battery chain follow the firmware pin map but have not been tested on the bench yet.</p>
+      </div>
+    </section>
+  </div>
+</div>

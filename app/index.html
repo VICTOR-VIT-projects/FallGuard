@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FallGuard</title>
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root {
+  --bg: #f4f6f8; --card: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
+  --ok: #0f766e; --warn: #b45309; --bad: #b91c1c; --info: #1d4ed8; --chip: #eef2f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0f14; --card: #151b23; --text: #e5e7eb; --muted: #9ca3af; --line: #263040;
+    --ok: #2dd4bf; --warn: #f59e0b; --bad: #f87171; --info: #60a5fa; --chip: #1e2733;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0f14; --card: #151b23; --text: #e5e7eb; --muted: #9ca3af; --line: #263040;
+  --ok: #2dd4bf; --warn: #f59e0b; --bad: #f87171; --info: #60a5fa; --chip: #1e2733;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; position: sticky; top: 0; background: var(--bg); z-index: 2; }
+header h1 { font-size: 18px; margin: 0; display: flex; gap: 8px; align-items: center; }
+header img { width: 26px; height: 26px; }
+main { max-width: 560px; margin: 0 auto; padding: 0 16px 40px; display: grid; gap: 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.pill { font-size: 12px; padding: 4px 10px; border-radius: 99px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+.pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.bad { color: #fff; background: var(--bad); }
+#state { font-size: 28px; font-weight: 700; letter-spacing: .5px; }
+#stateDesc { color: var(--muted); margin-top: 2px; }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+.metric { background: var(--chip); border-radius: 10px; padding: 8px; }
+.metric b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+.metric span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+canvas { width: 100%; height: 110px; display: block; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+button { font: inherit; border: 0; border-radius: 10px; padding: 11px 14px; background: var(--chip); color: var(--text); cursor: pointer; }
+button.primary { background: var(--ok); color: #fff; } button.danger { background: var(--bad); color: #fff; }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+.grow { flex: 1; }
+#sos { position: relative; overflow: hidden; }
+#sos i { position: absolute; inset: 0; background: rgba(255,255,255,.3); transform: scaleX(0); transform-origin: left; }
+details summary { cursor: pointer; font-weight: 600; }
+label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+input[type=text], input[type=tel] { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+.small { font-size: 12px; color: var(--muted); }
+#log { max-height: 260px; overflow: auto; font: 12px/1.5 ui-monospace, Consolas, monospace; margin-top: 8px; }
+#log div { border-bottom: 1px solid var(--line); padding: 3px 0; }
+#overlay { position: fixed; inset: 0; display: none; flex-direction: column; justify-content: center; align-items: center; gap: 16px; padding: 24px; text-align: center; color: #fff; z-index: 10; }
+#overlay.pending { display: flex; background: #b45309; } #overlay.confirmed { display: flex; background: #b91c1c; }
+#overlay h2 { font-size: 30px; margin: 0; } #overlay p { margin: 0; font-size: 16px; opacity: .95; }
+#ovCount { font-size: 72px; font-weight: 800; font-variant-numeric: tabular-nums; }
+#overlay button { background: #fff; color: #111; font-weight: 700; min-width: 220px; padding: 14px; }
+#overlay a { color: #fff; font-weight: 700; font-size: 17px; }
+#unsupported { display: none; }
+@media (max-width: 380px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <h1><img src="icon.svg" alt="">FallGuard</h1>
+  <span id="conn" class="pill">Disconnected</span>
+</header>
+
+<main>
+  <div id="unsupported" class="card">
+    <b>Web Bluetooth isn't available in this browser.</b>
+    <p class="small">Use Chrome or Edge on Android, Windows, macOS or ChromeOS, over HTTPS or localhost. On iPhone, use the Bluefy browser. Add <code>?demo</code> to the URL to try the interface without a device.</p>
+  </div>
+
+  <section class="card" aria-live="polite">
+    <div id="state">—</div>
+    <div id="stateDesc">Connect to your FallGuard device.</div>
+    <div class="grid">
+      <div class="metric"><b id="acc">–</b><span>|a| g</span></div>
+      <div class="metric"><b id="gyro">–</b><span>|ω| °/s</span></div>
+      <div class="metric"><b id="alerts">–</b><span>Alerts</span></div>
+      <div class="metric"><b id="uptime">–</b><span>Uptime</span></div>
+    </div>
+    <div class="chips" id="flags"></div>
+  </section>
+
+  <section class="card">
+    <div class="small">Acceleration magnitude, last 30 s (dashed: 1 g and 2.5 g impact threshold)</div>
+    <canvas id="chart" width="520" height="110"></canvas>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <button id="connect" class="primary grow">Connect device</button>
+      <button id="sos" class="danger grow" disabled><i></i>Hold for SOS</button>
+    </div>
+    <p class="small" id="lastEvent" style="margin:10px 0 0">No fall events analysed yet.</p>
+  </section>
+
+  <details class="card">
+    <summary>Emergency contact</summary>
+    <label for="cName">Name</label><input id="cName" type="text" autocomplete="name">
+    <label for="cPhone">Phone number</label><input id="cPhone" type="tel" autocomplete="tel" placeholder="+91…">
+    <p class="small">Stored only on this phone. On a confirmed alert the app shows one-tap Call and SMS buttons (with your location, if allowed). The app can't send an SMS by itself.</p>
+    <div class="row">
+      <button id="testAlarm">Test alarm sound</button>
+      <button id="wake">Keep screen on: off</button>
+    </div>
+  </details>
+
+  <details class="card">
+    <summary>Dataset label (for recording trials)</summary>
+    <p class="small">Sets the <code>label</code> column in the device's SD/serial CSV log.</p>
+    <div class="chips" id="labelChips"></div>
+    <div class="row" style="margin-top:8px">
+      <input id="label" type="text" class="grow" maxlength="19" placeholder="custom label" style="width:auto">
+      <button id="setLabel" disabled>Set</button>
+    </div>
+    <p class="small" id="labelNow">Current label: none</p>
+  </details>
+
+  <details class="card" open>
+    <summary>Event log</summary>
+    <div id="log"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="export">Export CSV</button><button id="clear">Clear</button>
+    </div>
+  </details>
+</main>
+
+<div id="overlay" role="alertdialog" aria-live="assertive">
+  <h2 id="ovTitle"></h2>
+  <div id="ovCount"></div>
+  <p id="ovText"></p>
+  <div id="ovContact" class="row" style="justify-content:center"></div>
+  <button id="ovCancel"></button>
+</div>
+
+<script>
+'use strict';
+const SVC = 'fa110001-7c4e-4b8a-9e2f-3d6a5b1c0e01';
+const STATUS = 'fa110002-7c4e-4b8a-9e2f-3d6a5b1c0e01';
+const CMD = 'fa110003-7c4e-4b8a-9e2f-3d6a5b1c0e01';
+const STATES = ['MONITORING', 'FREE_FALL', 'IMPACT', 'POST_IMPACT', 'ALERT_PENDING', 'ALERT_CONFIRMED', 'CANCELLED', 'SENSOR_FAULT'];
+const REASONS = ['—', 'impact + rotation + inactivity', 'manual SOS', 'sensor lost after impact'];
+const DESC = {
+  MONITORING: 'Monitoring normally.', FREE_FALL: 'Low-g detected, checking for impact…', IMPACT: 'Impact detected, analysing…',
+  POST_IMPACT: 'Checking for inactivity after impact…', ALERT_PENDING: 'Possible fall. Wearer can cancel.',
+  ALERT_CONFIRMED: 'Fall alert confirmed. Wearer needs help.', CANCELLED: 'Alert cancelled, re-arming.',
+  SENSOR_FAULT: 'Motion sensor not responding. NOT monitoring for falls.'
+};
+const COLOR = { ALERT_PENDING: '--warn', ALERT_CONFIRMED: '--bad', SENSOR_FAULT: '--bad', CANCELLED: '--info' };
+const LABELS = ['walking', 'sitting', 'standing_up', 'stairs', 'jumping', 'arm_swing', 'fall_sim', 'device_drop', 'none'];
+
+const $ = id => document.getElementById(id);
+let device = null, cmdChr = null, userDisconnect = false, lastPacket = 0, prevState = null, demo = null, stale = false, connLabel = '';
+const accHist = [];
+
+// ---------- storage (best-effort; private windows may block it) ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('fg.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('fg.' + k, JSON.stringify(v)); } catch {} }
+};
+let events = store.get('events', []);
+
+// ---------- packet ----------
+function parse(dv) {
+  return {
+    version: dv.getUint8(0), state: STATES[dv.getUint8(1)] || '?', flags: dv.getUint8(2), countdown: dv.getUint8(3),
+    acc: dv.getUint16(4, true) / 1000, gyro: dv.getUint16(6, true), peakG: dv.getUint16(8, true) / 1000,
+    peakDps: dv.getUint16(10, true), stillPct: dv.getUint8(12), orient: dv.getUint8(13),
+    alerts: dv.getUint16(14, true), uptime: dv.getUint32(16, true)
+  };
+}
+
+function onPacket(p) {
+  lastPacket = Date.now();
+  if (stale) { stale = false; setConn(connLabel, 'ok'); }
+  const imuOk = p.flags & 1, sdOk = p.flags & 2, cal = p.flags & 4, sat = p.flags & 8, reason = REASONS[(p.flags >> 4) & 3];
+  $('state').textContent = p.state.replace('_', ' ');
+  $('state').style.color = `var(${COLOR[p.state] || '--ok'})`;
+  $('stateDesc').textContent = DESC[p.state] || '';
+  $('acc').textContent = imuOk ? p.acc.toFixed(2) : '–';
+  $('gyro').textContent = imuOk ? p.gyro : '–';
+  $('alerts').textContent = p.alerts;
+  $('uptime').textContent = fmtUptime(p.uptime);
+  $('flags').replaceChildren(
+    chip(imuOk ? 'IMU OK' : 'IMU FAULT', imuOk ? 'ok' : 'bad'), chip(cal ? 'Calibrated' : 'Uncalibrated', cal ? 'ok' : 'warn'),
+    chip(sdOk ? 'SD logging' : 'No SD log', sdOk ? 'ok' : ''), ...(sat ? [chip('Sensor saturated', 'warn')] : []));
+  if (p.peakG > 0) $('lastEvent').textContent =
+    `Last event: peak ${p.peakG.toFixed(2)} g, rotation ${p.peakDps}°/s, ${p.stillPct}% still, orientation change ${p.orient}°.`;
+
+  accHist.push(imuOk ? p.acc : null);
+  if (accHist.length > 150) accHist.shift();
+  drawChart();
+
+  if (p.state !== prevState) {
+    if (prevState !== null) {
+      const extra = p.state.startsWith('ALERT') ? ` (${reason}, peak ${p.peakG.toFixed(2)} g, ${p.peakDps}°/s)` : '';
+      logEvent(`${prevState} → ${p.state}${extra}`);
+    }
+    if (p.state === 'ALERT_CONFIRMED') onConfirmed(reason);
+    if (p.state === 'SENSOR_FAULT') notify('FallGuard sensor fault', 'The motion sensor is not responding. Falls are NOT being detected.');
+    prevState = p.state;
+  }
+  showOverlay(p, reason);
+}
+
+// ---------- alert UI ----------
+function showOverlay(p, reason) {
+  const ov = $('overlay');
+  if (p.state === 'ALERT_PENDING') {
+    ov.className = 'pending';
+    $('ovTitle').textContent = 'Possible fall';
+    $('ovCount').textContent = p.countdown;
+    $('ovText').textContent = 'Alert will be confirmed when the countdown ends.';
+    $('ovContact').replaceChildren();
+    $('ovCancel').textContent = "I'm OK, cancel";
+    alarm(false);
+  } else if (p.state === 'ALERT_CONFIRMED') {
+    ov.className = 'confirmed';
+    $('ovTitle').textContent = 'FALL ALERT';
+    $('ovCount').textContent = '';
+    $('ovText').textContent = `Reason: ${reason}`;
+    $('ovCancel').textContent = 'Reset alert';
+    alarm(true);
+  } else {
+    ov.className = '';
+    alarm(false);
+  }
+}
+
+let position = null;
+function onConfirmed(reason) {
+  notify('FALL ALERT', `FallGuard: ${reason}. Check on the wearer now.`, true);
+  if (navigator.vibrate) navigator.vibrate([600, 200, 600, 200, 600]);
+  const contactRow = () => {
+    const phone = $('cPhone').value.trim(), name = $('cName').value.trim() || 'contact';
+    if (!phone) return $('ovContact').replaceChildren(text('Add an emergency contact in settings.'));
+    const where = position ? ` Location: https://maps.google.com/?q=${position.latitude.toFixed(5)},${position.longitude.toFixed(5)}` : '';
+    const body = encodeURIComponent(`FallGuard alert: possible fall (${reason}) at ${new Date().toLocaleTimeString()}.${where}`);
+    $('ovContact').replaceChildren(link(`tel:${phone}`, `Call ${name}`), link(`sms:${phone}?body=${body}`, `SMS ${name}`));
+  };
+  contactRow();
+  if (navigator.geolocation) navigator.geolocation.getCurrentPosition(
+    pos => { position = pos.coords; contactRow(); }, () => {}, { enableHighAccuracy: true, timeout: 15000 });
+}
+
+let audioCtx = null, alarmTimer = null;
+function alarm(on) {
+  if (!on) { clearInterval(alarmTimer); alarmTimer = null; return; }
+  if (alarmTimer || !audioCtx) return;
+  const beep = () => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'square'; o.frequency.value = 2400; g.gain.value = 0.25;
+    o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.25);
+  };
+  beep(); alarmTimer = setInterval(beep, 600);
+}
+function unlockAudio() {  // browsers only allow audio after a user gesture
+  try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch {}
+}
+
+async function notify(title, body, urgent = false) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const opts = { body, icon: 'icon.svg', tag: 'fallguard-' + title, requireInteraction: urgent, vibrate: urgent ? [500, 200, 500] : undefined };
+  try { const reg = await navigator.serviceWorker?.getRegistration(); reg ? reg.showNotification(title, opts) : new Notification(title, opts); } catch {}
+}
+
+// ---------- BLE ----------
+async function connect() {
+  unlockAudio();
+  if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  if (location.search.includes('demo')) return startDemo();
+  try {
+    device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }, { namePrefix: 'FallGuard' }], optionalServices: [SVC] });
+  } catch (e) { return; }  // user closed the chooser
+  device.addEventListener('gattserverdisconnected', onDisconnected);
+  userDisconnect = false;
+  await linkUp();
+}
+
+async function linkUp(attempt = 0) {
+  setConn(attempt ? `Reconnecting (${attempt})…` : 'Connecting…', 'warn');
+  try {
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(SVC);
+    const st = await svc.getCharacteristic(STATUS);
+    cmdChr = await svc.getCharacteristic(CMD);
+    st.oncharacteristicvaluechanged = e => onPacket(parse(e.target.value));  // property, not addEventListener: no duplicates after reconnect
+    await st.startNotifications();
+    onPacket(parse(await st.readValue()));
+    setConn(connLabel = `Connected: ${device.name || 'FallGuard'}`, 'ok');
+    logEvent('Connected');
+    setButtons(true);
+  } catch (e) {
+    if (userDisconnect) return;
+    const wait = Math.min(30000, 1000 * 2 ** attempt);
+    setConn(`Retrying in ${Math.round(wait / 1000)} s…`, 'warn');
+    setTimeout(() => linkUp(attempt + 1), wait);
+  }
+}
+
+function onDisconnected() {
+  cmdChr = null;
+  setButtons(false);
+  if (userDisconnect) { setConn('Disconnected'); return; }
+  logEvent('Connection lost');
+  notify('FallGuard disconnected', 'The phone lost contact with the device. The device still alarms locally.');
+  setConn('Connection lost', 'bad');
+  linkUp(1);
+}
+
+async function send(bytes) {
+  if (demo) return demo.cmd(bytes);
+  if (!cmdChr) return;
+  try { await cmdChr.writeValue(new Uint8Array(bytes)); } catch (e) { logEvent('Command failed: ' + e.message); }
+}
+
+// ---------- demo mode (?demo): simulated device for trying the UI ----------
+function startDemo() {
+  let state = 0, t = 0, since = 0, alerts = 0, reason = 0;
+  demo = {
+    cmd(b) {
+      if (b[0] === 1 && (state === 4 || state === 5)) { state = 6; since = t; }
+      if (b[0] === 2) { state = 5; reason = 2; alerts++; since = t; }
+      if (b[0] === 3) logEvent('Label set (demo)');
+    }
+  };
+  setInterval(() => {
+    t += 200;
+    if (state === 0 && t % 20000 === 0) { state = 4; reason = 1; alerts++; since = t; }
+    if (state === 4 && t - since >= 10000) state = 5;
+    if (state === 6 && t - since >= 3000) state = 0;
+    const lying = state >= 4 && state <= 5;
+    const acc = lying ? 1 + Math.random() * 0.03 : 1 + Math.sin(t / 300) * 0.25 + Math.random() * 0.1;
+    const buf = new DataView(new ArrayBuffer(20));
+    buf.setUint8(0, 1); buf.setUint8(1, state); buf.setUint8(2, 1 | 4 | (reason << 4));
+    buf.setUint8(3, state === 4 ? Math.ceil((10000 - (t - since)) / 1000) : 0);
+    buf.setUint16(4, acc * 1000, true); buf.setUint16(6, lying ? 2 : 40 + Math.random() * 30, true);
+    buf.setUint16(8, alerts ? 3610 : 0, true); buf.setUint16(10, alerts ? 248 : 0, true);
+    buf.setUint8(12, alerts ? 96 : 0); buf.setUint8(13, alerts ? 87 : 0);
+    buf.setUint16(14, alerts, true); buf.setUint32(16, t, true);
+    onPacket(parse(buf));
+  }, 200);
+  setConn(connLabel = 'Demo device', 'ok');
+  setButtons(true);
+  $('connect').disabled = true;
+}
+
+// ---------- helpers ----------
+function setConn(t, cls = '') { const c = $('conn'); c.textContent = t; c.className = 'pill ' + cls; }
+function setButtons(on) {
+  $('sos').disabled = $('setLabel').disabled = !on;
+  $('connect').textContent = on ? 'Disconnect' : 'Connect device';
+}
+function chip(t, cls) { const s = document.createElement('span'); s.className = 'pill ' + cls; s.textContent = t; return s; }
+function text(t) { const s = document.createElement('span'); s.textContent = t; return s; }
+function link(href, t) { const a = document.createElement('a'); a.href = href; a.textContent = t; return a; }
+function fmtUptime(ms) { const s = Math.floor(ms / 1000); return s < 3600 ? `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}` : `${Math.floor(s / 3600)}h${String(Math.floor(s / 60) % 60).padStart(2, '0')}`; }
+
+function logEvent(msg) {
+  events.push({ t: new Date().toISOString(), msg });
+  if (events.length > 300) events = events.slice(-300);
+  store.set('events', events);
+  renderLog();
+}
+function renderLog() {
+  $('log').replaceChildren(...events.slice().reverse().map(e => {
+    const d = document.createElement('div'); d.textContent = `${new Date(e.t).toLocaleString()}  ${e.msg}`; return d;
+  }));
+}
+
+function drawChart() {
+  const c = $('chart'), ctx = c.getContext('2d'), css = getComputedStyle(document.documentElement);
+  const w = c.width = c.clientWidth * devicePixelRatio, h = c.height = c.clientHeight * devicePixelRatio;
+  const max = 4, y = v => h - (v / max) * h, x = i => (i / 149) * w;
+  ctx.clearRect(0, 0, w, h);
+  ctx.setLineDash([4 * devicePixelRatio, 4 * devicePixelRatio]); ctx.lineWidth = devicePixelRatio;
+  for (const [v, col] of [[1, '--muted'], [2.5, '--warn']]) {
+    ctx.strokeStyle = css.getPropertyValue(col); ctx.beginPath(); ctx.moveTo(0, y(v)); ctx.lineTo(w, y(v)); ctx.stroke();
+  }
+  ctx.setLineDash([]); ctx.lineWidth = 2 * devicePixelRatio; ctx.strokeStyle = css.getPropertyValue('--ok'); ctx.beginPath();
+  let pen = false;
+  accHist.forEach((v, i) => {
+    if (v == null) { pen = false; return; }
+    const px = x(i + 150 - accHist.length), py = y(Math.min(v, max));
+    pen ? ctx.lineTo(px, py) : ctx.moveTo(px, py); pen = true;
+  });
+  ctx.stroke();
+}
+
+// ---------- wiring ----------
+if (!navigator.bluetooth && !location.search.includes('demo')) { $('unsupported').style.display = 'block'; $('connect').disabled = true; }
+
+$('connect').onclick = () => {
+  if (device?.gatt.connected) { userDisconnect = true; device.gatt.disconnect(); } else connect();
+};
+$('ovCancel').onclick = () => send([0x01]);
+
+let sosTimer = null;
+const sosBar = $('sos').querySelector('i');
+$('sos').onpointerdown = () => {
+  sosBar.style.transition = 'transform 1.5s linear'; sosBar.style.transform = 'scaleX(1)';
+  sosTimer = setTimeout(() => { send([0x02]); logEvent('SOS sent from app'); }, 1500);
+};
+$('sos').onpointerup = $('sos').onpointerleave = () => {
+  clearTimeout(sosTimer); sosBar.style.transition = 'none'; sosBar.style.transform = 'scaleX(0)';
+};
+
+$('labelChips').replaceChildren(...LABELS.map(l => {
+  const b = document.createElement('button'); b.textContent = l; b.className = 'pill'; b.onclick = () => { $('label').value = l; $('setLabel').click(); }; return b;
+}));
+$('setLabel').onclick = () => {
+  const l = $('label').value.trim().replace(/[^\x20-\x7e]/g, '').slice(0, 19) || 'none';
+  send([0x03, ...new TextEncoder().encode(l)]);
+  $('labelNow').textContent = 'Current label: ' + l;
+  logEvent('Label: ' + l);
+};
+
+for (const id of ['cName', 'cPhone']) { $(id).value = store.get(id, ''); $(id).oninput = () => store.set(id, $(id).value); }
+$('testAlarm').onclick = () => { unlockAudio(); alarm(true); setTimeout(() => alarm(false), 1800); };
+
+let wakeLock = null;
+$('wake').onclick = async () => {
+  try {
+    if (wakeLock) { await wakeLock.release(); wakeLock = null; }
+    else { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.onrelease = () => { wakeLock = null; $('wake').textContent = 'Keep screen on: off'; }; }
+  } catch {}
+  $('wake').textContent = 'Keep screen on: ' + (wakeLock ? 'on' : 'off');
+};
+
+$('export').onclick = () => {
+  const csv = 'time,event\n' + events.map(e => `${e.t},"${e.msg.replace(/"/g, '""')}"`).join('\n');
+  const a = link(URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), '');
+  a.download = `fallguard-events-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+};
+$('clear').onclick = () => { events = []; store.set('events', events); renderLog(); };
+
+// Stale-data watchdog: a silent link must never look like "all fine".
+setInterval(() => {
+  if ((device?.gatt.connected || demo) && lastPacket && Date.now() - lastPacket > 3000 && !stale) {
+    stale = true;
+    setConn('No data from device', 'bad');
+  }
+}, 1000);
+
+renderLog();
+drawChart();
+document.addEventListener('pointerdown', unlockAudio, { once: true });
+if (location.search.includes('demo')) startDemo();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
