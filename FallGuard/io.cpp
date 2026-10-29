@@ -34,10 +34,12 @@ namespace Io {
 void begin() {
   pinMode(PIN_BTN_CANCEL, INPUT_PULLUP);
   pinMode(PIN_BTN_SOS, INPUT_PULLUP);
-  pinMode(PIN_BUZZER, OUTPUT);
+  // Passive buzzer: needs an AC square wave, not DC. LEDC generates it in
+  // hardware, so the sensor task only flips the duty cycle on/off.
+  ledcAttach(PIN_BUZZER, BUZZER_FREQ_HZ, 8);
+  ledcWrite(PIN_BUZZER, 0);
   pinMode(PIN_LED_GREEN, OUTPUT);
   pinMode(PIN_LED_RED, OUTPUT);
-  digitalWrite(PIN_BUZZER, LOW);
 }
 
 Cmd pollButtons(uint32_t now) {
@@ -74,6 +76,10 @@ void drive(FallState st, uint32_t now) {
   }
   digitalWrite(PIN_LED_GREEN, green);
   digitalWrite(PIN_LED_RED, red);
-  digitalWrite(PIN_BUZZER, buzz);
+  static bool buzzing = false;
+  if (buzz != buzzing) {  // only touch LEDC on changes, not every 10 ms
+    buzzing = buzz;
+    ledcWrite(PIN_BUZZER, buzz ? 128 : 0);  // 50% duty = loudest square wave
+  }
 }
 }  // namespace Io

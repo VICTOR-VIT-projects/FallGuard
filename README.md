@@ -54,7 +54,7 @@ Full diagram with power chain and first-power-on checklist: **[docs/wiring.html]
 | IMU SDA / SCL | GPIO 21 / 22 | hardware I2C, address 0x68, VCC 3V3 |
 | OLED SDA / SCL | GPIO 16 / 17 | software I2C, SH1106, address 0x3C, VCC 3V3 |
 | SD CS / SCK / MISO / MOSI | GPIO 5 / 18 / 19 / 23 | *planned*; GPIO 5 is a strapping pin, so move CS to 14 if boot fails |
-| Buzzer | GPIO 13 | *planned*; active buzzer through an NPN transistor (e.g. 2N2222 + 1 kΩ base resistor), HIGH = on |
+| Buzzer | GPIO 13 | *planned*; **passive** buzzer driven by a 2.7 kHz PWM square wave (`BUZZER_FREQ_HZ`), through an NPN transistor (e.g. 2N2222 + 1 kΩ base resistor) |
 | Cancel button | GPIO 25 | *planned*; to GND, internal pull-up |
 | SOS button | GPIO 26 | *planned*; to GND, internal pull-up, hold 1 s |
 | Green / red LED | GPIO 32 / 33 | *planned*; with ~330 Ω series resistors |

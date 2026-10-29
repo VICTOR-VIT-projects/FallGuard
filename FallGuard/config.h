@@ -17,7 +17,8 @@ constexpr int PIN_SD_CS = 5;      // boot-strap pin; move to 14 if the SD module
 constexpr int PIN_SD_SCK = 18;
 constexpr int PIN_SD_MISO = 19;
 constexpr int PIN_SD_MOSI = 23;
-constexpr int PIN_BUZZER = 13;    // active buzzer via NPN transistor, HIGH = on
+constexpr int PIN_BUZZER = 13;    // PASSIVE buzzer, driven with a PWM square wave
+constexpr uint32_t BUZZER_FREQ_HZ = 2700;  // try 2000-4000: pick the loudest for your buzzer
 constexpr int PIN_BTN_CANCEL = 25;  // to GND, internal pull-up
 constexpr int PIN_BTN_SOS = 26;     // to GND, internal pull-up
 constexpr int PIN_LED_GREEN = 32;
